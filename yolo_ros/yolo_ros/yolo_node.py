@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
+import cv2
 from typing import List, Dict
 from cv_bridge import CvBridge
 

@@ -27,6 +27,7 @@ def generate_launch_description():
 
         use_tracking = eval(context.perform_substitution(use_tracking))
         use_3d = eval(context.perform_substitution(use_3d))
+        use_3d = True
 
         model_type = LaunchConfiguration("model_type")
         model_type_cmd = DeclareLaunchArgument(
@@ -137,14 +138,14 @@ def generate_launch_description():
         input_image_topic = LaunchConfiguration("input_image_topic")
         input_image_topic_cmd = DeclareLaunchArgument(
             "input_image_topic",
-            default_value="/camera/rgb/image_raw",
+            default_value="/head_front_camera/rgb/image_raw",
             description="Name of the input image topic",
         )
 
         image_reliability = LaunchConfiguration("image_reliability")
         image_reliability_cmd = DeclareLaunchArgument(
             "image_reliability",
-            default_value="1",
+            default_value="2",
             choices=["0", "1", "2"],
             description="Specific reliability QoS of the input image topic (0=system default, 1=Reliable, 2=Best Effort)",
         )
@@ -152,7 +153,7 @@ def generate_launch_description():
         input_depth_topic = LaunchConfiguration("input_depth_topic")
         input_depth_topic_cmd = DeclareLaunchArgument(
             "input_depth_topic",
-            default_value="/camera/depth/image_raw",
+            default_value="/head_front_camera/depth/image_raw",
             description="Name of the input depth topic",
         )
 
@@ -167,14 +168,14 @@ def generate_launch_description():
         input_depth_info_topic = LaunchConfiguration("input_depth_info_topic")
         input_depth_info_topic_cmd = DeclareLaunchArgument(
             "input_depth_info_topic",
-            default_value="/camera/depth/camera_info",
+            default_value="/head_front_camera/depth/camera_info",
             description="Name of the input depth info topic",
         )
 
         depth_info_reliability = LaunchConfiguration("depth_info_reliability")
         depth_info_reliability_cmd = DeclareLaunchArgument(
             "depth_info_reliability",
-            default_value="1",
+            default_value="2",
             choices=["0", "1", "2"],
             description="Specific reliability QoS of the input depth info topic (0=system default, 1=Reliable, 2=Best Effort)",
         )
@@ -341,7 +342,7 @@ def generate_launch_description():
     use_3d = LaunchConfiguration("use_3d")
     use_3d_cmd = DeclareLaunchArgument(
         "use_3d",
-        default_value="False",
+        default_value="True",
         description="Whether to activate 3D detections",
     )
 
