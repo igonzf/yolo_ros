@@ -26,6 +26,7 @@ from rclpy.qos import QoSReliabilityPolicy
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.lifecycle import LifecycleState
+from rclpy.lifecycle import State
 
 import torch
 from ultralytics import YOLO, YOLOWorld, YOLOE
@@ -44,12 +45,14 @@ from yolo_msgs.msg import KeyPoint2DArray
 from yolo_msgs.msg import Detection
 from yolo_msgs.msg import DetectionArray
 from yolo_msgs.srv import SetClasses
+from yolo_msgs.srv import ChangeModel
 
 
 class YoloNode(LifecycleNode):
 
     def __init__(self) -> None:
         super().__init__("yolo_node")
+        self.first_configuration = True
 
         # params
         self.declare_parameter("model_type", "YOLO")
@@ -121,6 +124,11 @@ class YoloNode(LifecycleNode):
 
         self._pub = self.create_lifecycle_publisher(DetectionArray, "detections", 10)
         self.cv_bridge = CvBridge()
+
+        # services
+        if self.first_configuration:
+            self._change_model_srv = self.create_service(ChangeModel, "change_model", self.change_model_cb)
+            self.first_configuration = False
 
         super().on_configure(state)
         self.get_logger().info(f"[{self.get_name()}] Configured")
@@ -397,6 +405,33 @@ class YoloNode(LifecycleNode):
         self.get_logger().info(f"Setting classes: {req.classes}")
         self.yolo.set_classes(req.classes)
         self.get_logger().info(f"New classes: {self.yolo.names}")
+        return res
+
+    def change_model_cb(
+        self,
+        req: ChangeModel.Request,
+        res: ChangeModel.Response
+    ) -> ChangeModel.Response:
+        try:
+            if req.model == self.model:
+                res.success = True
+                res.message = f'Model already set to {req.model}.'
+                return res
+
+            self.get_logger().info(f'Changing model to {req.model}...')
+           
+            self.trigger_deactivate()
+            self.set_parameters([rclpy.Parameter(name="model", value=req.model)])
+            self.trigger_configure()
+            self.trigger_activate()
+            
+
+            res.success = True
+            res.message = f'Model changed to {req.model} successfully.'
+        except Exception as e:
+            self.get_logger().error(f'Failed to change model: {str(e)}')
+            res.success = False
+            res.message = f'Failed to change model: {str(e)}'
         return res
 
 
