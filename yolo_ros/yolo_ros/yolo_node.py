@@ -27,6 +27,7 @@ from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.lifecycle import LifecycleState
 from rclpy.lifecycle import State
+from rclpy_cascade_lifecycle.cascade_lifecycle_node import CascadeLifecycleNode
 
 import torch
 from ultralytics import YOLO, YOLOWorld, YOLOE
@@ -48,7 +49,7 @@ from yolo_msgs.srv import SetClasses
 from yolo_msgs.srv import ChangeModel
 
 
-class YoloNode(LifecycleNode):
+class YoloNode(CascadeLifecycleNode):
 
     def __init__(self) -> None:
         super().__init__("yolo_node")
@@ -74,7 +75,7 @@ class YoloNode(LifecycleNode):
 
         self.type_to_model = {"YOLO": YOLO, "World": YOLOWorld, "YOLOE": YOLOE}
 
-    def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Configuring...")
 
         # model params
@@ -135,7 +136,7 @@ class YoloNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_activate(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Activating...")
 
         try:
@@ -168,7 +169,7 @@ class YoloNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_deactivate(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Deactivating...")
 
         del self.yolo
@@ -191,7 +192,7 @@ class YoloNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_cleanup(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Cleaning up...")
 
         self.destroy_publisher(self._pub)
@@ -203,7 +204,7 @@ class YoloNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_shutdown(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Shutting down...")
         super().on_cleanup(state)
         self.get_logger().info(f"[{self.get_name()}] Shutted down")

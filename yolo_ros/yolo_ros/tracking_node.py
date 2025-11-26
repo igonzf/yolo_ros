@@ -22,6 +22,8 @@ from rclpy.qos import QoSReliabilityPolicy
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.lifecycle import LifecycleState
+from rclpy.lifecycle import State
+from rclpy_cascade_lifecycle.cascade_lifecycle_node import CascadeLifecycleNode
 
 import cv2
 import numpy as np
@@ -39,7 +41,7 @@ from yolo_msgs.msg import Detection
 from yolo_msgs.msg import DetectionArray
 
 
-class TrackingNode(LifecycleNode):
+class TrackingNode(CascadeLifecycleNode):
 
     def __init__(self) -> None:
         super().__init__("tracking_node")
@@ -50,7 +52,7 @@ class TrackingNode(LifecycleNode):
 
         self.cv_bridge = CvBridge()
 
-    def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Configuring...")
 
         tracker_name = self.get_parameter("tracker").get_parameter_value().string_value
@@ -67,7 +69,7 @@ class TrackingNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_activate(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Activating...")
 
         image_qos_profile = QoSProfile(
@@ -95,7 +97,7 @@ class TrackingNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_deactivate(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Deactivating...")
 
         self.destroy_subscription(self.image_sub.sub)
@@ -109,7 +111,7 @@ class TrackingNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_cleanup(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Cleaning up...")
 
         del self.tracker
@@ -119,7 +121,7 @@ class TrackingNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_shutdown(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Shutting down...")
         super().on_cleanup(state)
         self.get_logger().info(f"[{self.get_name()}] Shutted down")

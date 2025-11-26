@@ -28,6 +28,8 @@ from rclpy.qos import QoSReliabilityPolicy
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.lifecycle import LifecycleState
+from rclpy.lifecycle import State
+from rclpy_cascade_lifecycle.cascade_lifecycle_node import CascadeLifecycleNode
 
 import message_filters
 from cv_bridge import CvBridge
@@ -43,7 +45,7 @@ from yolo_msgs.msg import Detection
 from yolo_msgs.msg import DetectionArray
 
 
-class DebugNode(LifecycleNode):
+class DebugNode(CascadeLifecycleNode):
 
     def __init__(self) -> None:
         super().__init__("debug_node")
@@ -54,7 +56,7 @@ class DebugNode(LifecycleNode):
         # params
         self.declare_parameter("image_reliability", QoSReliabilityPolicy.BEST_EFFORT)
 
-    def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Configuring...")
 
         self.image_qos_profile = QoSProfile(
@@ -76,7 +78,7 @@ class DebugNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_activate(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Activating...")
 
         # subs
@@ -97,7 +99,7 @@ class DebugNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_deactivate(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Deactivating...")
 
         self.destroy_subscription(self.image_sub.sub)
@@ -110,7 +112,7 @@ class DebugNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_cleanup(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Cleaning up...")
 
         self.destroy_publisher(self._dbg_pub)
@@ -122,7 +124,7 @@ class DebugNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_shutdown(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Shutting down...")
         super().on_cleanup(state)
         self.get_logger().info(f"[{self.get_name()}] Shutted down")

@@ -249,3 +249,10 @@ ros2 launch yolo_bringup yolo.launch.py model:=yolov8m-pose.pt use_3d:=True
 ```
 
 [![](https://drive.google.com/thumbnail?authuser=0&sz=w1280&id=1j4VjCAsOCx_mtM2KFPOLkpJogM0t227r)](https://drive.google.com/file/d/1j4VjCAsOCx_mtM2KFPOLkpJogM0t227r/view?usp=sharing)
+
+
+## Change YOLO model 
+
+```shell
+ros2 service call /yolo/change_model yolo_msgs/srv/ChangeModel "{model: 'yolov8m-pose.pt'}"
+```

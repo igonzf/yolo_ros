@@ -1,0 +1,4 @@
+  thirdparty/rclcpp_cascade_lifecycle:
+    type: git
+    url: https://github.com/fmrico/cascade_lifecycle.git
+    version: ad2e905fc4bebcb436af177f35685bf60e821cdc

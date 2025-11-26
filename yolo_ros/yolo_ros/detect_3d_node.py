@@ -26,6 +26,8 @@ from rclpy.qos import QoSReliabilityPolicy
 from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from rclpy.lifecycle import LifecycleState
+from rclpy.lifecycle import State
+from rclpy_cascade_lifecycle.cascade_lifecycle_node import CascadeLifecycleNode
 
 import message_filters
 from cv_bridge import CvBridge
@@ -42,7 +44,7 @@ from yolo_msgs.msg import KeyPoint3DArray
 from yolo_msgs.msg import BoundingBox3D
 
 
-class Detect3DNode(LifecycleNode):
+class Detect3DNode(CascadeLifecycleNode):
 
     def __init__(self) -> None:
         super().__init__("bbox3d_node")
@@ -60,7 +62,7 @@ class Detect3DNode(LifecycleNode):
         self.tf_buffer = Buffer()
         self.cv_bridge = CvBridge()
 
-    def on_configure(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_configure(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Configuring...")
 
         self.target_frame = (
@@ -111,7 +113,7 @@ class Detect3DNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_activate(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_activate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Activating...")
 
         # subs
@@ -135,7 +137,7 @@ class Detect3DNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_deactivate(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Deactivating...")
 
         self.destroy_subscription(self.depth_sub.sub)
@@ -149,7 +151,7 @@ class Detect3DNode(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_cleanup(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Cleaning up...")
 
         del self.tf_listener
@@ -159,7 +161,7 @@ class Detect3DNode(LifecycleNode):
         super().on_cleanup(state)
         self.get_logger().info(f"[{self.get_name()}] Cleaned up")
 
-    def on_shutdown(self, state: LifecycleState) -> TransitionCallbackReturn:
+    def on_shutdown(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Shutting down...")
         super().on_cleanup(state)
         self.get_logger().info(f"[{self.get_name()}] Shutted down")
