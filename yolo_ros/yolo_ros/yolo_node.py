@@ -393,6 +393,7 @@ class YoloNode(CascadeLifecycleNode):
 
             # publish detections
             detections_msg.header = msg.header
+            detections_msg.source_img = msg
             self._pub.publish(detections_msg)
 
             del results

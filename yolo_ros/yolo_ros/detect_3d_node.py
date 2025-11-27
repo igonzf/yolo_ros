@@ -173,9 +173,10 @@ class Detect3DNode(CascadeLifecycleNode):
         depth_info_msg: CameraInfo,
         detections_msg: DetectionArray,
     ) -> None:
-
+        
         new_detections_msg = DetectionArray()
         new_detections_msg.header = detections_msg.header
+        new_detections_msg.source_img = detections_msg.source_img
         new_detections_msg.detections = self.process_detections(
             depth_msg, depth_info_msg, detections_msg
         )
@@ -187,7 +188,6 @@ class Detect3DNode(CascadeLifecycleNode):
         depth_info_msg: CameraInfo,
         detections_msg: DetectionArray,
     ) -> List[Detection]:
-
         # check if there are detections
         if not detections_msg.detections:
             return []

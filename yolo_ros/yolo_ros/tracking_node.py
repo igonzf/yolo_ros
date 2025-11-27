@@ -146,6 +146,7 @@ class TrackingNode(CascadeLifecycleNode):
 
         tracked_detections_msg = DetectionArray()
         tracked_detections_msg.header = img_msg.header
+        tracked_detections_msg.source_img = img_msg
 
         # convert image
         cv_image = self.cv_bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
