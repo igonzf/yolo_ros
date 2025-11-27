@@ -47,7 +47,7 @@ from yolo_msgs.msg import BoundingBox3D
 class Detect3DNode(CascadeLifecycleNode):
 
     def __init__(self) -> None:
-        super().__init__("bbox3d_node")
+        super().__init__("detect_3d_node")
 
         # parameters
         self.declare_parameter("target_frame", "base_link")
@@ -441,8 +441,8 @@ class Detect3DNode(CascadeLifecycleNode):
 def main():
     rclpy.init()
     node = Detect3DNode()
-    node.trigger_configure()
-    node.trigger_activate()
+    #node.trigger_configure()
+    #node.trigger_activate()
 
     try:
         rclpy.spin(node)

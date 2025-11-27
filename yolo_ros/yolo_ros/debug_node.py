@@ -380,8 +380,8 @@ class DebugNode(CascadeLifecycleNode):
 def main():
     rclpy.init()
     node = DebugNode()
-    node.trigger_configure()
-    node.trigger_activate()
+    #node.trigger_configure()
+    #node.trigger_activate()
 
     try:
         rclpy.spin(node)
