@@ -337,6 +337,9 @@ class YoloNode(CascadeLifecycleNode):
 
     def image_cb(self, msg: Image) -> None:
 
+        if not hasattr(self, 'yolo') or self.yolo is None:
+            return
+
         if self.enable:
 
             # convert image + predict
