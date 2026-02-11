@@ -35,6 +35,9 @@ from ultralytics.engine.results import Results
 from ultralytics.engine.results import Boxes
 from ultralytics.engine.results import Masks
 from ultralytics.engine.results import Keypoints
+from ultralytics.trackers import BOTSORT, BYTETracker
+from ultralytics.utils import IterableSimpleNamespace, YAML
+from ultralytics.utils.checks import check_requirements, check_yaml
 
 from std_srvs.srv import SetBool
 from sensor_msgs.msg import Image
@@ -72,6 +75,7 @@ class YoloNode(CascadeLifecycleNode):
         self.declare_parameter("augment", False)
         self.declare_parameter("agnostic_nms", False)
         self.declare_parameter("retina_masks", False)
+        self.declare_parameter("tracker", "bytetrack.yaml")
 
         self.type_to_model = {"YOLO": YOLO, "World": YOLOWorld, "YOLOE": YOLOE}
 
@@ -114,6 +118,7 @@ class YoloNode(CascadeLifecycleNode):
         self.reliability = (
             self.get_parameter("image_reliability").get_parameter_value().integer_value
         )
+        self.tracker = self.get_parameter("tracker").get_parameter_value().string_value
 
         # detection pub
         self.image_qos_profile = QoSProfile(
@@ -225,20 +230,32 @@ class YoloNode(CascadeLifecycleNode):
 
         if results.boxes:
             box_data: Boxes
-            for box_data in results.boxes:
+            # Get track IDs if tracking is enabled
+            track_ids = None
+            if results.boxes.is_track and results.boxes.id is not None:
+                track_ids = results.boxes.id.int().cpu().tolist()
+
+            for i, box_data in enumerate(results.boxes):
                 hypothesis = {
                     "class_id": int(box_data.cls),
                     "class_name": self.yolo.names[int(box_data.cls)],
                     "score": float(box_data.conf),
+                    "track_id": track_ids[i] if track_ids else -1,
                 }
                 hypothesis_list.append(hypothesis)
 
         elif results.obb:
+            # Get track IDs if tracking is enabled
+            track_ids = None
+            if results.obb.is_track and results.obb.id is not None:
+                track_ids = results.obb.id.int().cpu().tolist()
+
             for i in range(results.obb.cls.shape[0]):
                 hypothesis = {
                     "class_id": int(results.obb.cls[i]),
                     "class_name": self.yolo.names[int(results.obb.cls[i])],
                     "score": float(results.obb.conf[i]),
+                    "track_id": track_ids[i] if track_ids else -1,
                 }
                 hypothesis_list.append(hypothesis)
 
@@ -346,8 +363,9 @@ class YoloNode(CascadeLifecycleNode):
             cv_image = self.cv_bridge.imgmsg_to_cv2(
                 msg, desired_encoding=self.yolo_encoding
             )
-            results = self.yolo.predict(
+            results = self.yolo.track(
                 source=cv_image,
+                persist=True,
                 verbose=False,
                 stream=False,
                 conf=self.threshold,
@@ -359,6 +377,7 @@ class YoloNode(CascadeLifecycleNode):
                 agnostic_nms=self.agnostic_nms,
                 retina_masks=self.retina_masks,
                 device=self.device,
+                tracker=self.tracker
             )
             results: Results = results[0].cpu()
 
@@ -383,7 +402,7 @@ class YoloNode(CascadeLifecycleNode):
                     aux_msg.class_id = hypothesis[i]["class_id"]
                     aux_msg.class_name = hypothesis[i]["class_name"]
                     aux_msg.score = hypothesis[i]["score"]
-
+                    aux_msg.id = str(int(hypothesis[i]["track_id"]))
                     aux_msg.bbox = boxes[i]
 
                 if results.masks and masks:

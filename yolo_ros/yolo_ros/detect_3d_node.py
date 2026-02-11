@@ -42,6 +42,8 @@ from yolo_msgs.msg import DetectionArray
 from yolo_msgs.msg import KeyPoint3D
 from yolo_msgs.msg import KeyPoint3DArray
 from yolo_msgs.msg import BoundingBox3D
+from yolo_msgs.msg import KeyPoint2D
+from yolo_msgs.msg import Point2D
 
 
 class Detect3DNode(CascadeLifecycleNode):
@@ -255,47 +257,110 @@ class Detect3DNode(CascadeLifecycleNode):
             roi = depth_image[v_min:v_max, u_min:u_max]
 
         roi = roi / self.depth_image_units_divisor  # convert to meters
+        
+        nominal_bb_center_z_coord = (
+            depth_image[int(center_y)][int(center_x)] / self.depth_image_units_divisor
+        )
+
+        # check if there is valid information in the ROI
+        roi = np.ma.masked_invalid(roi).filled(0)
         if not np.any(roi):
             return None
 
         # find the z coordinate on the 3D BB
         if detection.mask.data:
-            roi = roi[roi > 0]
-            bb_center_z_coord = np.median(roi)
-
+            roi_filtered = roi[roi > 0]
+            if len(roi_filtered) > 0:
+                z_coord = np.median(roi_filtered)
+            else:
+                return None
         else:
-            bb_center_z_coord = (
-                depth_image[int(center_y)][int(center_x)] / self.depth_image_units_divisor
-            )
+            # Use nominal center if valid, otherwise fallback to mean
+            if np.isfinite(nominal_bb_center_z_coord) and nominal_bb_center_z_coord != 0:
+                z_coord = nominal_bb_center_z_coord
+            else:
+                roi_filtered = roi[roi > 0]
+                if len(roi_filtered) > 0:
+                    z_coord = np.mean(roi_filtered)
+                else:
+                    return None
 
-        z_diff = np.abs(roi - bb_center_z_coord)
+        # Keypoint-based center refinement for person detection
+        up = Point2D()
+        down = Point2D()
+        up_detected = False
+        down_detected = False
+
+        kp5 = KeyPoint2D()
+        kp6 = KeyPoint2D()
+        kp11 = KeyPoint2D()
+        kp12 = KeyPoint2D()
+
+        # get the keypoints (COCO format: 5,6=shoulders, 11,12=hips)
+        for kp in detection.keypoints.data:
+            if kp.id == 5:
+                kp5 = kp
+                up_detected = True
+            elif kp.id == 6:
+                kp6 = kp
+                up_detected = True
+            elif kp.id == 11:
+                kp11 = kp
+                down_detected = True
+            elif kp.id == 12:
+                kp12 = kp
+                down_detected = True
+
+        # if the keypoints are detected, use them to refine center
+        if up_detected and down_detected:
+            # get shoulder with better score
+            up = kp5 if kp5.score > kp6.score else kp6
+            # get hip with better score
+            down = kp11 if kp11.score > kp12.score else kp12
+
+            center_x = (up.point.x + down.point.x) / 2
+            center_y = (up.point.y + down.point.y) / 2
+
+        elif up_detected and not down_detected:
+            up = kp5 if kp5.score > kp6.score else kp6
+            center_x = up.point.x
+            center_y = up.point.y
+
+        elif down_detected and not up_detected:
+            down = kp11 if kp11.score > kp12.score else kp12
+            center_x = down.point.x
+            center_y = down.point.y
+
+        # check center_x and center_y inside the image limits
+        center_x = min(max(0, int(center_x)), depth_image.shape[1] - 1)
+        center_y = min(max(0, int(center_y)), depth_image.shape[0] - 1)
+
+        z_diff = np.abs(roi - z_coord)
         mask_z = z_diff <= self.maximum_detection_threshold
+
         if not np.any(mask_z):
-            return None
-
-        roi = roi[mask_z]
-        z_min, z_max = np.min(roi), np.max(roi)
-        z = (z_max + z_min) / 2
-
-        if z == 0:
-            return None
+            z_size = self.maximum_detection_threshold
+        else:
+            roi_threshold = roi[mask_z]
+            z_min, z_max = np.min(roi_threshold), np.max(roi_threshold)
+            z_size = float(z_max - z_min)
 
         # project from image to world space
         k = depth_info.k
         px, py, fx, fy = k[2], k[5], k[0], k[4]
-        x = z * (center_x - px) / fx
-        y = z * (center_y - py) / fy
-        w = z * (size_x / fx)
-        h = z * (size_y / fy)
+        x = z_coord * (center_x - px) / fx
+        y = z_coord * (center_y - py) / fy
+        w = z_coord * (size_x / fx)
+        h = z_coord * (size_y / fy)
 
         # create 3D BB
         msg = BoundingBox3D()
         msg.center.position.x = x
         msg.center.position.y = y
-        msg.center.position.z = z
+        msg.center.position.z = z_coord
         msg.size.x = w
         msg.size.y = h
-        msg.size.z = float(z_max - z_min)
+        msg.size.z = z_size
 
         return msg
 

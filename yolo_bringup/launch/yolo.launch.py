@@ -19,6 +19,8 @@ from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
+from ament_index_python.packages import get_package_share_directory
+import os
 
 
 def generate_launch_description():
@@ -28,6 +30,10 @@ def generate_launch_description():
         use_tracking = eval(context.perform_substitution(use_tracking))
         use_3d = eval(context.perform_substitution(use_3d))
         use_3d = True
+
+        # Get the full path to the tracker config
+        yolo_ros_dir = get_package_share_directory('yolo_ros')
+        tracker_config_path = os.path.join(yolo_ros_dir, 'config', 'botsort.yaml')
 
         model_type = LaunchConfiguration("model_type")
         model_type_cmd = DeclareLaunchArgument(
@@ -40,14 +46,14 @@ def generate_launch_description():
         model = LaunchConfiguration("model")
         model_cmd = DeclareLaunchArgument(
             "model",
-            default_value="yolov8m.pt",
+            default_value="yolo11n.pt",
             description="Model name or path",
         )
 
         tracker = LaunchConfiguration("tracker")
         tracker_cmd = DeclareLaunchArgument(
             "tracker",
-            default_value="bytetrack.yaml",
+            default_value=tracker_config_path,
             description="Tracker name or path",
         )
 
@@ -138,7 +144,7 @@ def generate_launch_description():
         input_image_topic = LaunchConfiguration("input_image_topic")
         input_image_topic_cmd = DeclareLaunchArgument(
             "input_image_topic",
-            default_value="/head_front_camera/rgb/image_raw",
+            default_value="/head_front_camera/image",
             description="Name of the input image topic",
         )
 
@@ -153,7 +159,7 @@ def generate_launch_description():
         input_depth_topic = LaunchConfiguration("input_depth_topic")
         input_depth_topic_cmd = DeclareLaunchArgument(
             "input_depth_topic",
-            default_value="/head_front_camera/depth/image_raw",
+            default_value="/head_front_camera/depth_image",
             description="Name of the input depth topic",
         )
 
@@ -168,7 +174,7 @@ def generate_launch_description():
         input_depth_info_topic = LaunchConfiguration("input_depth_info_topic")
         input_depth_info_topic_cmd = DeclareLaunchArgument(
             "input_depth_info_topic",
-            default_value="/head_front_camera/depth/camera_info",
+            default_value="/head_front_camera/camera_info",
             description="Name of the input depth info topic",
         )
 
@@ -190,7 +196,7 @@ def generate_launch_description():
         depth_image_units_divisor = LaunchConfiguration("depth_image_units_divisor")
         depth_image_units_divisor_cmd = DeclareLaunchArgument(
             "depth_image_units_divisor",
-            default_value="1000",
+            default_value="1",
             description="Divisor used to convert the raw depth image values into metres",
         )
 
@@ -219,12 +225,7 @@ def generate_launch_description():
         detect_3d_detections_topic = "detections"
         debug_detections_topic = "detections"
 
-        if use_tracking:
-            detect_3d_detections_topic = "tracking"
-
-        if use_tracking and not use_3d:
-            debug_detections_topic = "tracking"
-        elif use_3d:
+        if use_3d:
             debug_detections_topic = "detections_3d"
 
         yolo_node_cmd = Node(
@@ -237,6 +238,7 @@ def generate_launch_description():
                     "model_type": model_type,
                     "model": model,
                     "device": device,
+                    "tracker": tracker,
                     "yolo_encoding": yolo_encoding,
                     "enable": enable,
                     "threshold": threshold,
