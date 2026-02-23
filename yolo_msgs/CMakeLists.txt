@@ -23,6 +23,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DetectionArray.msg"
   "srv/SetClasses.srv"
   "srv/ChangeModel.srv"
+  "srv/SetPersitentID.srv"
   DEPENDENCIES std_msgs geometry_msgs sensor_msgs
 )
 

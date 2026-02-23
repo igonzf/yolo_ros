@@ -144,7 +144,7 @@ def generate_launch_description():
         input_image_topic = LaunchConfiguration("input_image_topic")
         input_image_topic_cmd = DeclareLaunchArgument(
             "input_image_topic",
-            default_value="/head_front_camera/image",
+            default_value="/head_front_camera/rgb/image_raw",
             description="Name of the input image topic",
         )
 
@@ -159,14 +159,14 @@ def generate_launch_description():
         input_depth_topic = LaunchConfiguration("input_depth_topic")
         input_depth_topic_cmd = DeclareLaunchArgument(
             "input_depth_topic",
-            default_value="/head_front_camera/depth_image",
+            default_value="/head_front_camera/depth/image_raw",
             description="Name of the input depth topic",
         )
 
         depth_image_reliability = LaunchConfiguration("depth_image_reliability")
         depth_image_reliability_cmd = DeclareLaunchArgument(
             "depth_image_reliability",
-            default_value="1",
+            default_value="2",
             choices=["0", "1", "2"],
             description="Specific reliability QoS of the input depth image topic (0=system default, 1=Reliable, 2=Best Effort)",
         )
@@ -174,7 +174,7 @@ def generate_launch_description():
         input_depth_info_topic = LaunchConfiguration("input_depth_info_topic")
         input_depth_info_topic_cmd = DeclareLaunchArgument(
             "input_depth_info_topic",
-            default_value="/head_front_camera/camera_info",
+            default_value="/head_front_camera/rgb/camera_info",
             description="Name of the input depth info topic",
         )
 

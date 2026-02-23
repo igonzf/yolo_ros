@@ -50,6 +50,8 @@ from yolo_msgs.msg import Detection
 from yolo_msgs.msg import DetectionArray
 from yolo_msgs.srv import SetClasses
 from yolo_msgs.srv import ChangeModel
+from yolo_msgs.srv import SetPersitentID
+
 
 
 class YoloNode(CascadeLifecycleNode):
@@ -159,6 +161,7 @@ class YoloNode(CascadeLifecycleNode):
                 self.get_logger().warn(f"Error while fuse: {e}")
 
         self._enable_srv = self.create_service(SetBool, "enable", self.enable_cb)
+        self._set_persitent_id_srv = self.create_service(SetPersitentID, "set_persitent_id", self.set_persitent_id_cb)
 
         if isinstance(self.yolo, YOLOWorld):
             self._set_classes_srv = self.create_service(
@@ -184,6 +187,8 @@ class YoloNode(CascadeLifecycleNode):
 
         self.destroy_service(self._enable_srv)
         self._enable_srv = None
+        self.destroy_service(self._set_persitent_id_srv)
+        self._set_persitent_id_srv = None
 
         if isinstance(self.yolo, YOLOWorld):
             self.destroy_service(self._set_classes_srv)
@@ -215,6 +220,16 @@ class YoloNode(CascadeLifecycleNode):
         self.get_logger().info(f"[{self.get_name()}] Shutted down")
         return TransitionCallbackReturn.SUCCESS
 
+    def set_persitent_id_cb(
+        self,
+        request: SetPersitentID.Request,
+        response: SetPersitentID.Response,
+    ) -> SetPersitentID.Response:
+        self.yolo.add_persistent_track(request.id)
+        response.success = True
+        response.message = "Persitent ID set to " + str(request.id)
+        return response
+    
     def enable_cb(
         self,
         request: SetBool.Request,
