@@ -1,5 +1,5 @@
 numpy<2
 opencv-python>=4.8.1.78
 typing-extensions>=4.4.0
-ultralytics==8.3.168
+ultralytics @ git+https://github.com/juandpenan/ultralytics.git@main
 lap>=0.5.12
