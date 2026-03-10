@@ -14,9 +14,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
+import json
+
 import cv2
 from typing import List, Dict
 from cv_bridge import CvBridge
+import numpy as np
 
 import rclpy
 from rclpy.qos import QoSProfile
@@ -51,6 +54,9 @@ from yolo_msgs.msg import DetectionArray
 from yolo_msgs.srv import SetClasses
 from yolo_msgs.srv import ChangeModel
 from yolo_msgs.srv import SetPersitentID
+from yolo_msgs.srv import PersonIdentity
+
+import face_recognition
 
 
 
@@ -59,6 +65,10 @@ class YoloNode(CascadeLifecycleNode):
     def __init__(self) -> None:
         super().__init__("yolo_node")
         self.first_configuration = True
+        self._detect_person_by_identity = False
+        self._identity_to_store = None 
+        self._store_identity_vector = False
+        self._identity_vectors_cache = {}
 
         # params
         self.declare_parameter("model_type", "YOLO")
@@ -138,6 +148,9 @@ class YoloNode(CascadeLifecycleNode):
             self._change_model_srv = self.create_service(ChangeModel, "change_model", self.change_model_cb)
             self.first_configuration = False
 
+        self._store_identity_vector_srv = self.create_service(PersonIdentity, "store_identity_vector", self.store_identity_vector_cb)
+        self._detect_person_by_identity_srv = self.create_service(SetBool, "detect_person_by_identity", self.detect_person_by_identity_cb)
+
         super().on_configure(state)
         self.get_logger().info(f"[{self.get_name()}] Configured")
 
@@ -179,6 +192,7 @@ class YoloNode(CascadeLifecycleNode):
 
     def on_deactivate(self, state: State) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Deactivating...")
+        is_yolo_world = isinstance(self.yolo, YOLOWorld)
 
         del self.yolo
         if "cuda" in self.device:
@@ -190,7 +204,7 @@ class YoloNode(CascadeLifecycleNode):
         self.destroy_service(self._set_persitent_id_srv)
         self._set_persitent_id_srv = None
 
-        if isinstance(self.yolo, YOLOWorld):
+        if is_yolo_world:
             self.destroy_service(self._set_classes_srv)
             self._set_classes_srv = None
 
@@ -409,6 +423,21 @@ class YoloNode(CascadeLifecycleNode):
             # create detection msgs
             detections_msg = DetectionArray()
 
+            rgb_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+
+            if self._store_identity_vector:
+
+                person_to_enroll = self.select_best_person_for_enrollment(results, rgb_image)
+                if person_to_enroll is not None:
+                    self._identity_vectors_cache[self._identity_to_store] = person_to_enroll
+                    self.get_logger().info(f"Stored face vector for {self._identity_to_store} identity")
+
+                else:
+                    self.get_logger().warn("No suitable person detected for enrollment. Please try again.")
+
+                self._store_identity_vector = False
+                self._identity_to_store = None
+
             for i in range(len(results)):
 
                 aux_msg = Detection()
@@ -425,8 +454,58 @@ class YoloNode(CascadeLifecycleNode):
 
                 if results.keypoints and keypoints:
                     aux_msg.keypoints = keypoints[i]
+                                
+                if self._detect_person_by_identity:
+                    if aux_msg.class_name == "person":
+                        
+                        cx = aux_msg.bbox.center.position.x
+                        cy = aux_msg.bbox.center.position.y
+                        w = aux_msg.bbox.size.x
+                        h = aux_msg.bbox.size.y
 
-                detections_msg.detections.append(aux_msg)
+                        x1 = max(0, int(cx - w / 2))
+                        y1 = max(0, int(cy - h / 2))
+                        x2 = min(rgb_image.shape[1], int(cx + w / 2))
+                        y2 = min(rgb_image.shape[0], int(cy + h / 2))
+
+                        matched_identity = None
+
+                        if x2 > x1 and y2 > y1:
+                            person_crop = np.ascontiguousarray(rgb_image[y1:y2, x1:x2])
+
+                            detected_faces = face_recognition.face_locations(person_crop, model="hog")
+
+                            if len(detected_faces) > 0:
+                                encodings = face_recognition.face_encodings(person_crop)
+
+                                if len(encodings) > 0:
+                                    detected_encoding = encodings[0]
+
+                                    for identity, identity_vector in self._identity_vectors_cache.items():
+
+                                        is_match = face_recognition.compare_faces(
+                                            [identity_vector],
+                                            detected_encoding,
+                                            tolerance=0.45
+                                        )[0]
+
+                                        if is_match:
+                                            self.get_logger().debug(
+                                                f"Detection {aux_msg.id} matches requested identity: {identity}"
+                                            )
+                                            matched_identity = identity
+                                            
+                        if matched_identity is not None:
+                            aux_msg.class_name = matched_identity
+                        else:
+                            self.get_logger().debug(
+                                f"Detection {aux_msg.id} does not match any stored identity"
+                            )
+                            aux_msg.class_name = "unknown"
+                            
+                        detections_msg.detections.append(aux_msg)
+                else:
+                    detections_msg.detections.append(aux_msg)
 
             # publish detections
             detections_msg.header = msg.header
@@ -472,7 +551,140 @@ class YoloNode(CascadeLifecycleNode):
             res.success = False
             res.message = f'Failed to change model: {str(e)}'
         return res
+    
+    def detect_person_by_identity_cb(
+        self,
+        req : SetBool.Request,
+        res : SetBool.Response
+    ) -> SetBool.Response:
+         
+        if req.data:
 
+            if len(self._identity_vectors_cache) == 0:
+                self.get_logger().error("No identity vectors stored. Please store at least one identity vector before enabling this feature.")
+                self._detect_person_by_identity = False
+                res.success = False
+                res.message = "No identity vectors stored. Please store at least one identity vector before enabling this feature."
+                
+            else:
+                self._detect_person_by_identity = True
+                res.success = True
+                res.message = "Detecting person by identity enabled"
+
+        else:
+            self._detect_person_by_identity = False
+
+            res.success = True
+            res.message = "Detecting person by identity disabled"
+
+        return res
+    
+    def store_identity_vector_cb(
+        self,
+        req : PersonIdentity.Request,
+        res : PersonIdentity.Response
+    ) -> PersonIdentity.Response:
+        identity = req.identity.strip() 
+        
+        if identity:
+            self._store_identity_vector = True
+            self._identity_to_store = identity
+            res.success = True 
+            res.message = f"Ready to store face vector for identity: {identity}"
+        else:
+            self._store_identity_vector = False
+            self._identity_to_store = None
+            res.success = False
+            res.message = "Store identity vector disabled"
+            
+        return res
+    
+    def select_best_person_for_enrollment(self, results, rgb_image):
+
+        if results.boxes is None:
+            return None
+
+        img_h, img_w = rgb_image.shape[:2]
+        img_cx = img_w / 2.0
+        img_cy = img_h / 2.0
+
+        best_encoding = None
+        best_score = -float("inf")
+
+        for box in results.boxes:
+
+            class_id = int(box.cls)
+            class_name = self.yolo.names[class_id]
+
+            if class_name == "person":
+
+                cx, cy, w, h = box.xywh[0].tolist()
+
+                if w > 0 and h > 0:
+
+                    x1 = max(0, int(cx - w / 2))
+                    y1 = max(0, int(cy - h / 2))
+                    x2 = min(img_w, int(cx + w / 2))
+                    y2 = min(img_h, int(cy + h / 2))
+
+                    if x2 > x1 and y2 > y1:
+                        
+                        person_crop = np.ascontiguousarray(rgb_image[y1:y2, x1:x2])
+
+                        if person_crop.size > 0:
+
+                            detected_faces = face_recognition.face_locations(
+                                person_crop, model="hog"
+                            )
+
+                            self.get_logger().info(
+                                f"Detected {len(detected_faces)} face(s) in first person crop"
+                            )
+
+                            if len(detected_faces) > 0:
+                                try:
+                                    encodings = face_recognition.face_encodings(person_crop)
+                                except Exception as e:
+                                    self.get_logger().warn(
+                                        f"Failed to compute face encoding during enrollment: {e}"
+                                    )
+                                    encodings = []
+
+                                if len(encodings) > 0:
+                                    #cara
+                                    best_face_area = -1
+                                    for face in detected_faces:
+                                        top, right, bottom, left = face
+                                        fw = max(0, right - left)
+                                        fh = max(0, bottom - top)
+                                        face_area = fw * fh
+
+                                        if face_area > best_face_area:
+                                            best_face_area = face_area
+                                    
+                                    if best_face_area > 0:
+                                        person_area = (x2 - x1) * (y2 - y1)
+                                        dist_to_center = np.sqrt((cx - img_cx) ** 2 + (cy - img_cy) ** 2)
+
+                                        norm_face_area = best_face_area / float(img_w * img_h)
+                                        norm_person_area = person_area / float(img_w * img_h)
+                                        norm_center_dist = dist_to_center / float(np.sqrt(img_w ** 2 + img_h ** 2))
+
+                                        score = (
+                                            0.60 * norm_face_area +
+                                            0.20 * norm_person_area -
+                                            0.25 * norm_center_dist
+                                        )
+
+                                        if score > best_score:
+                                            best_score = score
+                                            best_encoding = encodings[0]
+                                            
+
+        if best_encoding is not None:
+            self.get_logger().info("Enrollment encoding computed successfully")                   
+
+        return best_encoding
 
 def main():
     rclpy.init()
