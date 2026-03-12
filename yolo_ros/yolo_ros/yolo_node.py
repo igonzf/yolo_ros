@@ -136,8 +136,8 @@ class YoloNode(CascadeLifecycleNode):
         # services
         if self.first_configuration:
             self._change_model_srv = self.create_service(ChangeModel, "change_model", self.change_model_cb)
+            self._set_persitent_id_srv = self.create_service(SetPersitentID, "set_persitent_id", self.set_persitent_id_cb)
             self.first_configuration = False
-
         super().on_configure(state)
         self.get_logger().info(f"[{self.get_name()}] Configured")
 
@@ -161,7 +161,6 @@ class YoloNode(CascadeLifecycleNode):
                 self.get_logger().warn(f"Error while fuse: {e}")
 
         self._enable_srv = self.create_service(SetBool, "enable", self.enable_cb)
-        self._set_persitent_id_srv = self.create_service(SetPersitentID, "set_persitent_id", self.set_persitent_id_cb)
 
         if isinstance(self.yolo, YOLOWorld):
             self._set_classes_srv = self.create_service(
