@@ -496,12 +496,12 @@ class YoloNode(CascadeLifecycleNode):
                                             matched_identity = identity
                                             
                         if matched_identity is not None:
-                            aux_msg.class_name = matched_identity
+                            aux_msg.id = matched_identity
                         else:
                             self.get_logger().debug(
                                 f"Detection {aux_msg.id} does not match any stored identity"
                             )
-                            aux_msg.class_name = "unknown"
+                            aux_msg.id = "unknown"
                             
                         detections_msg.detections.append(aux_msg)
                 else:
