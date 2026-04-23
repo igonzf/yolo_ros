@@ -149,6 +149,7 @@ class YoloNode(CascadeLifecycleNode):
             self._set_persitent_id_srv = self.create_service(SetPersitentID, "set_persitent_id", self.set_persitent_id_cb)
             self._store_identity_vector_srv = self.create_service(PersonIdentity, "store_identity_vector", self.store_identity_vector_cb)
             self._detect_person_by_identity_srv = self.create_service(SetBool, "detect_person_by_identity", self.detect_person_by_identity_cb)
+            # self._has_stored_identity_srv = self.create_service(PersonIdentity, "has_stored_identity", self.has_stored_identity_cb)
             self.first_configuration = False
 
 
@@ -175,6 +176,9 @@ class YoloNode(CascadeLifecycleNode):
                 self.get_logger().warn(f"Error while fuse: {e}")
 
         self._enable_srv = self.create_service(SetBool, "enable", self.enable_cb)
+        if (self._set_persitent_id_srv is None):
+            self._set_persitent_id_srv = self.create_service(SetPersitentID, "set_persitent_id", self.set_persitent_id_cb)
+        
 
         if isinstance(self.yolo, YOLOWorld):
             self._set_classes_srv = self.create_service(
@@ -239,9 +243,17 @@ class YoloNode(CascadeLifecycleNode):
         request: SetPersitentID.Request,
         response: SetPersitentID.Response,
     ) -> SetPersitentID.Response:
-        self.yolo.add_persistent_track(request.id)
-        response.success = True
-        response.message = "Persitent ID set to " + str(request.id)
+        try:
+            self.get_logger().info(
+                f'[{self.get_name()}] Setting persistent ID {request.id}'
+            )
+            self.yolo.add_persistent_track(request.id)
+            response.success = True
+            response.message = f'Persistent ID set to {request.id}'
+        except Exception as e:
+            self.get_logger().error(f'Error in set_persitent_id_cb: {e}')
+            response.success = False
+            response.message = str(e)
         return response
     
     def enable_cb(
@@ -539,6 +551,7 @@ class YoloNode(CascadeLifecycleNode):
             self.get_logger().info(f'Changing model to {req.model}...')
            
             self.trigger_deactivate()
+            self.trigger_cleanup()
             self.set_parameters([rclpy.Parameter(name="model", value=req.model)])
             self.trigger_configure()
             self.trigger_activate()
@@ -598,6 +611,18 @@ class YoloNode(CascadeLifecycleNode):
             res.message = "Store identity vector disabled"
             
         return res
+    
+    # def has_stored_identity_cb(self, req, res):
+    #     identity = req.identity.strip()
+
+    #     if identity in self._identity_vectors_cache:
+    #         res.success = True
+    #         res.message = f"Identity {identity} is stored"
+    #     else:
+    #         res.success = False
+    #         res.message = f"Identity {identity} NOT stored"
+
+    #     return res
     
     def select_best_person_for_enrollment(self, results, rgb_image):
 
